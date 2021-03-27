@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Создать видеопоток</title>
+    <link href="/static/style.css" rel="stylesheet">
+    <script type="text/javascript" src="/static/jquery-3.6.0.min.js"></script>
+    <script type="text/javascript" src="/static/control.js"></script>
+</head>
+
+<body>
+    Создать видеопоток
+    <form action="/create.html">
+        <div class="block">
+            <label>URL камеры откуда забирать поток</label>
+            <br />
+            <input class="target" id="url" type="text" size="200"
+                placeholder="rtsp://camUser:camPassword@192.168.1.108:554/cam/realmonitor?channel=1&subtype=0" />
+        </div>
+        <div class="block">
+            <label>Пользователь / Аудитория чей поток</label> <input class="target" id="user" type="text"
+                size="64" />
+        </div>
+        <div class="block">
+            <label>Имя камеры / Номер камеры чей поток</label> <input class="target" id="cam" type="text"
+                size="64" />
+        </div>
+        <div class="block">
+            Необязательные параметры - куда слать чанки:
+        </div>
+        <div class="block">
+            <input class="target" id="url1" type="text" size="200" placeholder="https://camUser:camPassword@host1/path1 symbol '|' forbiden" />
+            <br />
+            <input class="target" id="key1" type="text" size="64" placeholder="Auth symbol '|' forbiden" />
+            <input class="target" id="value1" type="text" size="64" placeholder="Value symbol '|' forbiden" />
+        </div>
+        <div class="block">
+            <input class="target" id="url2" type="text" size="200" placeholder="https://camUser:camPassword@host1/path2 symbol '|' forbiden" />
+            <br />
+            <input class="target" id="key2" type="text" size="64" placeholder="Auth symbol '|' forbiden" />
+            <input class="target" id="value2" type="text" size="64" placeholder="Value symbol '|' forbiden" />
+        </div>
+        <div class="block">
+            <input class="target" id="url3" type="text" size="200" placeholder="https://camUser:camPassword@host2/path1 symbol '|' forbiden" />
+            <br />
+            <input class="target" id="key3" type="text" size="64" placeholder="Auth symbol '|' forbiden" />
+            <input class="target" id="value3" type="text" size="64" placeholder="Value symbol '|' forbiden" />
+        </div>
+        <div class="block">
+            <input class="target" id="url4" type="text" size="200" placeholder="https://camUser:camPassword@host2/path2 symbol '|' forbiden" />
+            <br />
+            <input class="target" id="key4" type="text" size="64" placeholder="Auth symbol '|' forbiden" />
+            <input class="target" id="value4" type="text" size="64" placeholder="Value symbol '|' forbiden" />
+        </div>
+        <div class="block">
+            <label>Сгенерированная data:</label>
+            <br/>
+            <textarea id="data" name="data" cols="155" rows="25"></textarea>
+        </div>
+        <script>
+            function BuildJson() {
+                var o = {};
+
+                o.url = $("#url").val();
+                o.user = $("#user").val();
+                o.cam = $("#cam").val();
+
+                var arr = [];
+                o.notify = arr;
+
+                var add1 = {};
+                add1.url = $("#url1").val();
+                add1.key = $("#key1").val();
+                add1.value = $("#value1").val();
+                arr.push(add1)
+
+                var add2 = {};
+                add2.url = $("#url2").val();
+                add2.key = $("#key2").val();
+                add2.value = $("#value2").val();
+                arr.push(add2)
+
+                var add3 = {};
+                add3.url = $("#url3").val();
+                add3.key = $("#key3").val();
+                add3.value = $("#value3").val();
+                arr.push(add3)
+
+                var add4 = {};
+                add4.url = $("#url4").val();
+                add4.key = $("#key4").val();
+                add4.value = $("#value4").val();
+                arr.push(add4)
+
+                //console.log(JSON.stringify(o));
+                $("#data").val(JSON.stringify(o));
+                return true;
+            }
+            $(document).on("blur", ".target", function () {
+                console.log("BuildJson()");
+                BuildJson();
+            });
+        </script>
+        <div class="block">
+            <button type="submit" onsubmit="return BuildJson();">Создать</button>
+        </div>
+    </form>
+</body>
+
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>dash.js</title>
+	<link href="/static/style.css" rel="stylesheet">
+	<script src="/static/dash.all.debug.js"></script>
+	<script class="code">
+		var player, targetLatency, minDrift, catchupPlaybackRate, liveCatchupLatencyThreshold;
+
+		function init() {
+			var video = document.querySelector("video");
+			var url = "{{ . }}";
+
+			player = dashjs.MediaPlayer().create();
+			player.initialize(video, url, true);
+			player.updateSettings({ 'streaming': { 'lowLatencyEnabled': true } });
+
+			applyParameters();
+
+			return player;
+		}
+
+		function applyParameters() {
+			targetLatency = parseFloat(document.getElementById("target-latency").value, 10);
+			minDrift = parseFloat(document.getElementById("min-drift").value, 10);
+			catchupPlaybackRate = parseFloat(document.getElementById("catchup-playback-rate").value, 10);
+			liveCatchupLatencyThreshold = parseFloat(document.getElementById("catchup-threshold").value, 10);
+
+			player.updateSettings({
+				'streaming': {
+					'liveDelay': targetLatency,
+					'liveCatchUpMinDrift': minDrift,
+					'liveCatchUpPlaybackRate': catchupPlaybackRate,
+					"liveCatchupLatencyThreshold": liveCatchupLatencyThreshold,
+				}
+			});
+		}
+	</script>
+</head>
+
+<body>
+	<h1>просмотр {{.}} через dash.js плеер</h1>
+	<div>
+		<video controls="true" preload="auto" autoplay="autoplay"></video>
+		<br />
+		<input id="vol-control" type="range" min="0" max="100" step="5"></input>
+	</div>
+	<div style="width: 640px;">
+		<div>
+			<form action="javascript:applyParameters()">
+				<fieldset>
+					<legend>Configurable parameters</legend>
+					<p>Target Latency (secs): <input type="number" id="target-latency" value="2" min="0"></p>
+					<p>Min. drift (secs): <input type="number" id="min-drift" value="0.05" min="0.0" max="0.5"
+							step="0.01"></p>
+					<p>Catch-up playback rate (%): <input type="number" id="catchup-playback-rate" value="0.2" min="0.0"
+							max="0.5" step="0.01"></p>
+					<p>Live catchup latency threshold (secs): <input type="number" id="catchup-threshold" value="2">
+					</p>
+					<button type="submit">Apply</button>
+				</fieldset>
+			</form>
+		</div>
+		<br>
+		<fieldset>
+			<legend>Current values</legend>
+			<ul>
+				<li>Latency: <span id="latency-tag">200.526 secs</span></li>
+				<li>Min. drift: <span id="mindrift-tag">0.05 secs</span></li>
+				<li>Playback rate: <span id="playbackrate-tag">1</span></li>
+				<li>Live catchup latency threshold : <span id="catchup-threshold-tag">30 secs</span></li>
+				<li>Buffer: <b><span id="buffer-tag">67 secs</span></b></li>
+			</ul>
+		</fieldset>
+	</div>
+	<script>
+		document.addEventListener("DOMContentLoaded", function () {
+			var player = init();
+
+			setInterval(function () {
+				var dashMetrics = player.getDashMetrics();
+				var settings = player.getSettings();
+
+				var currentLatency = parseFloat(player.getCurrentLiveLatency(), 10);
+				document.getElementById("latency-tag").innerHTML = currentLatency + " secs";
+
+				document.getElementById("mindrift-tag").innerHTML = settings.streaming.liveCatchUpMinDrift + " secs";
+
+				var currentPlaybackRate = player.getPlaybackRate();
+				document.getElementById("playbackrate-tag").innerHTML = Math.round(currentPlaybackRate * 100) / 100;
+
+				var currentBuffer = dashMetrics.getCurrentBufferLevel("video");
+				document.getElementById("buffer-tag").innerHTML = currentBuffer + " secs";
+
+				document.getElementById("catchup-threshold-tag").innerHTML = settings.streaming.liveCatchupLatencyThreshold + " secs";
+
+			}, 200);
+
+			var video = document.querySelector("video");
+			var volumeControl = document.getElementById('vol-control');
+			volumeControl.addEventListener('change', function () {
+				video.volume = this.value / 100;
+			});
+		});
+	</script>
+</body>
+
+</html>

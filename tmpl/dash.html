@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>dash</title>
+    <link href="/static/style.css" rel="stylesheet">
+    <script type="text/javascript" src="/static/control.js"></script>
+</head>
+
+<body>
+    <div>
+        <h1>просмотр потоков через dash.js плеер</h1>
+        <form action="dash.html" method="POST">
+            <input id="url" type="text" name="url" value="" placeholder="http://127.0.0.1:9090/get/test/out.mpd" />
+            <button type="submit">смотреть</button>
+            <table>
+                <thead>
+                    <tr>
+                        <td>dash поток</td>
+                    </tr>
+                </thead>
+                {{ $length := len . }}
+                {{ if eq $length 0 }}
+                <tr>
+                    <td> <a href="/create.html">Создайте поток</a> </td>
+                </tr>
+                {{ end }}
+                {{ range $key, $value := . }}
+                <tr>
+                    <td>{{$key}}: {{$value}} <button type="submit" onclick="return setURL('/get{{ $key }}/master.mpd');">смотреть</button></td>
+                </tr>
+                {{ end }}
+            </table>
+        </form>
+    </div>
+</body>
+
+</html>

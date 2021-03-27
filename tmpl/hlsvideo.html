@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>hls.js</title>
+    <link href="/static/style.css" rel="stylesheet">
+    <!-- https://github.com/video-dev/hls.js/blob/master/docs/API.md -->
+    <script src="/static/hls.js"></script>
+</head>
+
+<body>
+    <h1>просмотр {{.}} через hls.js плеер</h1>
+    <div>
+        <video controls="true" preload="auto" autoplay="autoplay"></video>
+        <input id="vol-control" type="range" min="0" max="100" step="5"></input>
+    </div>
+    <!-- Your application source: -->
+    <script class="code">
+        if (Hls.isSupported()) {
+            var video = document.querySelector("video");
+            var config = {
+                liveSyncDuration: 2,
+                maxLiveSyncPlaybackRate: 1.2,
+                debug: true
+            }
+            var hls = new Hls(config);
+            // bind them together
+            hls.attachMedia(video);
+            // MEDIA_ATTACHED event is fired by hls object once MediaSource is ready
+            hls.on(Hls.Events.MEDIA_ATTACHED, function () {
+                console.log("video and hls.js are now bound together !");
+                hls.loadSource("{{ . }}");
+                hls.on(Hls.Events.MANIFEST_PARSED, function (event, data) {
+                    console.log("manifest loaded, found " + data.levels.length + " quality level");
+                });
+            });
+
+            hls.on(Hls.Events.ERROR, function (event, data) {
+                var errorType = data.type;
+                var errorDetails = data.details;
+                var errorFatal = data.fatal;
+                if (data.fatal) {
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            // try to recover network error
+                            console.log("fatal network error encountered, try to recover");
+                            hls.startLoad();
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            console.log("fatal media error encountered, try to recover");
+                            hls.recoverMediaError();
+                            break;
+                        default:
+                            // cannot recover
+                            hls.destroy();
+                            break;
+                    }
+                }
+            });
+        }
+
+        var video = document.querySelector("video");
+        var volumeControl = document.getElementById('vol-control');
+        volumeControl.addEventListener('change', function () {
+            video.volume = this.value / 100;
+        });
+    </script>
+</body>
+
+</html>

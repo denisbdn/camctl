@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>shaka</title>
+    <link href="/static/style.css" rel="stylesheet">
+    <script type="text/javascript" src="/static/control.js"></script>
+</head>
+
+<body>
+    <h1>Процесс</h1>
+    <div>URL: {{.Stream.URL}}</div>
+    <div>User: {{.Stream.User}}</div>
+    <div>Cam: {{.Stream.Cam}}</div>
+    <div>WorkDir: {{.Stream.WorkDir}}</div>
+
+    <h1>Нотификации</h1>
+    {{ range $notify := .Stream.Notify }}
+    <div>{{$notify.Key}}: {{$notify.Value}} - {{$notify.URL}}</div>
+    {{ end }}
+
+    <h1>В кеше</h1>
+    {{ range $cache := .Keys }}
+    <div><a href="/get{{$cache.Key}}">{{$cache.Key}}</a> {{$cache.Created.Format "15:04:05"}}</div>
+    {{ end }}
+
+    <script>
+        var ws
+        if (window.location.protocol === 'https:') {
+            ws = new WebSocket('wss://' + location.host + '/ws');
+        } else {
+            ws = new WebSocket('ws://' + location.host + '/ws');
+        }
+
+        function sendMessage(message) {
+            var jsonMessage = JSON.stringify(message);
+            console.log('Sending message: ' + jsonMessage);
+            ws.send(jsonMessage);
+        }
+
+        ws.onopen = function () {
+            console.log('Connected')
+            var initObj = {
+                method: "Init",
+                path: "/{{.Stream.User}}/{{.Stream.Cam}}"
+            }
+            sendMessage(initObj);
+        };
+
+        ws.onclose = function () {
+            console.log('Closed')
+        };
+
+        function addItem(mess) {
+            var ul = document.getElementById("list");
+            var li = document.createElement("li");
+            var ms = Date.parse(mess.entry.Time);
+            var date = new Date(ms)
+            var tm = date.getHours()+":"+date.getMinutes()+":"+date.getSeconds();
+            li.appendChild(document.createTextNode(mess.entry.Level+": "+tm+" - "+mess.entry.Message));
+            ul.appendChild(li);
+        }
+        function delItem(limit) {
+            var ul = document.getElementById("list");
+            var len = ul.getElementsByTagName("li").length
+            for (var i = 0; i < len - limit; i++) {
+                ul.removeChild(ul.firstChild);
+            }
+        }
+
+        ws.onmessage = function (message) {
+            var parsedMessage = JSON.parse(message.data);
+            console.info('Received message: ' + message.data);
+
+            switch (parsedMessage.method) {
+                case 'Log':
+                    addItem(parsedMessage);
+                    delItem(100)
+                    break;
+                case 'Ping':
+                    break;
+                default:
+                    console.error('Unrecognized message', parsedMessage);
+                    ws.close();
+            }
+        }
+    </script>
+
+    <h1>Лог</h1>
+    <ul id="list">
+        {{ range $entry := .Entries }}
+        <li>{{$entry.Level}}: {{$entry.Time.Format "15:04:05"}} - {{$entry.Message}}</li>
+        {{ end }}
+    </ul>
+</body>
+
+</html>
