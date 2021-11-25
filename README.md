@@ -79,6 +79,11 @@ sudo systemctl start camctl.service
 sudo systemctl start camctl.service 
 
 
+как использовать
+
+http://127.0.0.1:6060/
+
+
 camctl это сервис написанный на go он выступает в 2-х ролях
 
 1 запускает ffmpeg который стучиться за rtcp потоком на камеру
