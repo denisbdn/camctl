@@ -69,6 +69,17 @@ func (h *StreamHandler) GetProcArgs(proc string) *StreamFFMPEG {
 	return find
 }
 
+// GetProcArgs return stored *FFMPEG object by key
+func (h *StreamHandler) GetProcArgsFFMPEG(proc string) *FFMPEG {
+	h.procArgsMut.Lock()
+	defer h.procArgsMut.Unlock()
+	find, isFind := h.procArgs[proc]
+	if !isFind {
+		return nil
+	}
+	return &find.FFMPEG
+}
+
 func (h *StreamHandler) delProcArgs(proc string) *StreamFFMPEG {
 	h.procArgsMut.Lock()
 	defer h.procArgsMut.Unlock()
@@ -223,7 +234,11 @@ func (h *StreamHandler) runFFMPEG(sdpPath string, argsStr string, procArgs *Stre
 		}
 	}
 
-	cmd.Process.Signal(syscall.SIGQUIT)
+	errSig := cmd.Process.Signal(syscall.SIGQUIT)
+	if errSig != nil {
+		h.log.Sugar().Warnf("Process.Signal %s", errSig.Error())
+	}
+
 	if errAbs == nil {
 		delNotifications, isFind := h.items.DelNotifications(key)
 		if isFind && delNotifications != nil {
@@ -288,7 +303,7 @@ func (h *StreamHandler) start(c *gin.Context) {
 
 	// ищем шаблон для команды и аргументы
 	tmplName := StreamFfmpegCmd
-	procArgs := BuildStreamFFMPEG(name, workDir, url, *h.conf.Port, localconf.InitSegmentName, c.Request.URL.Query()["notify"])
+	procArgs := BuildStreamFFMPEG(name, workDir, url, *h.conf.Port, localconf.InitSegmentName, *h.conf.ChankDur*2, c.Request.URL.Query()["notify"])
 	tmpl, ok := h.conf.GetTmpl(tmplName)
 	if !ok {
 		localproxy.Error(c, "streamffmpeg.cmd not found", http.StatusInternalServerError)

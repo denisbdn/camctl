@@ -20,7 +20,7 @@ import (
 
 const (
 	// CacheTimeout is chank time live
-	CacheTimeout time.Duration = 60 * time.Second
+	CacheTimeout time.Duration = 5 * time.Minute
 
 	// MaxCacheTimeout is meta time live
 	MaxCacheTimeout time.Duration = 24 * time.Hour
@@ -114,10 +114,12 @@ func main() {
 	file := localproxy.NewFiles(&wg, bl.Log, conf, StorageTimeout)
 	server.Engine.GET("/allhistory", file.ServeHTTP)
 	server.Engine.POST("/allhistory", file.ServeHTTP)
+	server.Engine.GET("/allhistory/:user", file.ServeHTTP)
+	server.Engine.POST("/allhistory/:user", file.ServeHTTP)
 
 	tmplHandler := localtmpl.NewTmplHandlers(server.Engine, bl.Log, conf, proxy, stream, storage)
 
-	wsHandler := localws.NewWebsocketLog(stream, bl.Log)
+	wsHandler := localws.NewWebsocketLog(stream, storage, bl.Log)
 	server.Engine.GET("/ws", wsHandler.ServeHTTP)
 
 	// время

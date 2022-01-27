@@ -113,8 +113,8 @@ func NewConfig(log *zap.Logger) *Config {
 	c.TrustedIP = flag.String("trustedIP", "127.0.0.1;", "tusted host - regexp: list of IP with any delimeter")
 	c.WorkDir = flag.String("workDir", "ffmpeg", "work directory")
 	c.StoreDir = flag.String("storeDir", "store", "store directory")
-	c.ChankDur = flag.Uint("chankDur", 60, "store chank duration")
-	c.Chanks = flag.Uint("chanks", 60, "store chank number")
+	c.ChankDur = flag.Uint("chankDur", 60, "store chank duration, secons")
+	c.Chanks = flag.Uint("chanks", 5, "store chank number, number of files")
 	flag.Parse()
 
 	if err := c.parsePort(); err != nil {

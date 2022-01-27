@@ -67,6 +67,17 @@ func (h *StorageHandler) GetProcArgs(proc string) *StorageFFMPEG {
 	return find
 }
 
+// GetProcArgs return stored *FFMPEG object by key
+func (h *StorageHandler) GetProcArgsFFMPEG(proc string) *FFMPEG {
+	h.procArgsMut.Lock()
+	defer h.procArgsMut.Unlock()
+	find, isFind := h.procArgs[proc]
+	if !isFind {
+		return nil
+	}
+	return &find.FFMPEG
+}
+
 func (h *StorageHandler) delProcArgs(proc string) *StorageFFMPEG {
 	h.procArgsMut.Lock()
 	defer h.procArgsMut.Unlock()
@@ -148,9 +159,11 @@ func (h *StorageHandler) runFFMPEG(txtPath string, argsStr string, procArgs *Sto
 		if errRun != nil {
 			procArgs.Log.Log.Sugar().Errorf("stop cmd.Run() for %s return error: %s", txtPath, errRun.Error())
 			time.Sleep(time.Millisecond * 200)
+			os.Remove(txtPath)
 			return
 		}
 		procArgs.Log.Log.Sugar().Warnf("stop cmd.Run() for %s", txtPath)
+		os.Remove(txtPath)
 	}()
 
 	{
@@ -210,7 +223,10 @@ func (h *StorageHandler) runFFMPEG(txtPath string, argsStr string, procArgs *Sto
 		}
 	}
 
-	cmd.Process.Signal(syscall.SIGQUIT)
+	errSig := cmd.Process.Signal(syscall.SIGQUIT)
+	if errSig != nil {
+		h.log.Sugar().Warnf("Process.Signal %s", errSig.Error())
+	}
 
 	h.delProcArgs("/" + procArgs.Name)
 	h.log.Sugar().Warnf("stop runFFMPEG for %s", txtPath)
@@ -268,7 +284,7 @@ func (h *StorageHandler) start(c *gin.Context) {
 
 	// ищем шаблон для команды и аргументы
 	tmplName := StorageFfmpegCmd
-	procArgs := BuildStorageFFMPEG(name, storeDir, url, storeDir, *h.conf.ChankDur, *h.conf.Chanks, c.Request.URL.Query()["notify"])
+	procArgs := BuildStorageFFMPEG(name, storeDir, url, storeDir+name[dirEnd:], *h.conf.ChankDur, *h.conf.Chanks, c.Request.URL.Query()["notify"])
 	tmpl, ok := h.conf.GetTmpl(tmplName)
 	if !ok {
 		localproxy.Error(c, tmplName+" not found", http.StatusInternalServerError)

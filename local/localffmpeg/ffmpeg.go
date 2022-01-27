@@ -23,6 +23,7 @@ type StreamFFMPEG struct {
 	URLIn       string `json:"urlin,omitempty"`
 	Port        uint   `json:"port,omitempty"`
 	InitSegment string `json:"init,omitempty"`
+	ExtraWindow uint   `json:"extra,omitempty"`
 }
 
 // StorageFFMPEG describe cache object
@@ -34,7 +35,7 @@ type StorageFFMPEG struct {
 	StorageChanks uint   `json:"numbers,omitempty"`
 }
 
-func BuildStreamFFMPEG(name string, workDir string, URLIn string, port uint, initSegment string, notifications []string) *StreamFFMPEG {
+func BuildStreamFFMPEG(name string, workDir string, URLIn string, port uint, initSegment string, extraWindow uint, notifications []string) *StreamFFMPEG {
 	now := float64(time.Now().UTC().UnixNano()) / 1000000000
 	nowStr := fmt.Sprintf("%.6f", now)
 	nt := make([]*localnotif.Notification, 0)
@@ -48,7 +49,7 @@ func BuildStreamFFMPEG(name string, workDir string, URLIn string, port uint, ini
 			nt = append(nt, &localnotif.Notification{URL: array[0], Channel: make(chan *localnotif.NotificationData, 30)})
 		}
 	}
-	data := StreamFFMPEG{URLIn: URLIn, Port: port, InitSegment: initSegment, FFMPEG: FFMPEG{Name: name, Dir: workDir, TimeStr: nowStr, Notifications: nt}}
+	data := StreamFFMPEG{URLIn: URLIn, Port: port, InitSegment: initSegment, ExtraWindow: extraWindow, FFMPEG: FFMPEG{Name: name, Dir: workDir, TimeStr: nowStr, Notifications: nt}}
 	return &data
 }
 

@@ -140,6 +140,7 @@ type streamDesc struct {
 	URL     string       `json:"url,omitempty"`
 	User    string       `json:"user,omitempty"`
 	Cam     string       `json:"cam,omitempty"`
+	Type    string       `json:"type,omitempty"`
 	WorkDir string       `json:"workdir,omitempty"`
 	Notify  []notifyDesc `json:"notify,omitempty"`
 }
@@ -308,6 +309,7 @@ func (h *TmplHandlers) LogHandler(c *gin.Context) {
 		if strings.HasSuffix(c.Request.URL.Path, "streamlog.html") {
 			res.Keys = h.items.GetFiles(path)
 			stream := h.stream.GetProcArgs(path)
+			res.Stream.Type = "stream"
 			if stream != nil {
 				res.Entries = stream.Log.Buffer(200)
 				res.Stream.URL = stream.URLIn
@@ -328,7 +330,9 @@ func (h *TmplHandlers) LogHandler(c *gin.Context) {
 				res.Stream.Notify = make([]notifyDesc, 0)
 			}
 		} else if strings.HasSuffix(c.Request.URL.Path, "storagelog.html") {
+			res.Keys = localproxy.KeyFS(*h.conf.StoreDir+path, *h.conf.StoreDir)
 			stream := h.storage.GetProcArgs(path)
+			res.Stream.Type = "storage"
 			if stream != nil {
 				res.Entries = stream.Log.Buffer(200)
 				res.Stream.URL = stream.URLIn

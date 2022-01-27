@@ -12,14 +12,15 @@ import (
 
 // WebsocketLog struct describe websocket handler
 type WebsocketLog struct {
-	ffmpegs    *localffmpeg.StreamHandler
-	log        *zap.Logger
-	wsUpgrader websocket.Upgrader
+	ffmpegsStream  *localffmpeg.StreamHandler
+	ffmpegsStorage *localffmpeg.StorageHandler
+	log            *zap.Logger
+	wsUpgrader     websocket.Upgrader
 }
 
 // NewWebsocketLog build WebsocketLog object
-func NewWebsocketLog(ffmpegs *localffmpeg.StreamHandler, log *zap.Logger) *WebsocketLog {
-	res := WebsocketLog{ffmpegs, log, websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}}
+func NewWebsocketLog(ffmpegsStream *localffmpeg.StreamHandler, ffmpegsStorage *localffmpeg.StorageHandler, log *zap.Logger) *WebsocketLog {
+	res := WebsocketLog{ffmpegsStream, ffmpegsStorage, log, websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}}
 	return &res
 }
 
@@ -52,6 +53,7 @@ func (h *WebsocketLog) ServeHTTP(c *gin.Context) {
 	var init struct {
 		Method string `json:"method"`
 		Path   string `json:"path"`
+		Type   string `json:"type"`
 	}
 	errRead := ws.ReadJSON(&init)
 	if errRead != nil {
@@ -64,7 +66,12 @@ func (h *WebsocketLog) ServeHTTP(c *gin.Context) {
 		ws.WriteJSON(JSONResponce{Errno: BadParam, Error: "Bad method: {\"method\": \"Init\", \"path\": \"SomeKey\"}"})
 		return
 	}
-	ffmpeg := h.ffmpegs.GetProcArgs(init.Path)
+	var ffmpeg *localffmpeg.FFMPEG
+	if init.Type == "stream" {
+		ffmpeg = h.ffmpegsStream.GetProcArgsFFMPEG(init.Path)
+	} else if init.Type == "storage" {
+		ffmpeg = h.ffmpegsStorage.GetProcArgsFFMPEG(init.Path)
+	}
 	if ffmpeg == nil {
 		h.log.Sugar().Error("websocket ffmpeg not found", zap.Error(errRead))
 		ws.WriteJSON(JSONResponce{Errno: NotFound, Error: "Stream not found"})

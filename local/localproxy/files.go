@@ -77,6 +77,37 @@ func (f *Files) Close() {
 	atomic.StoreInt32(f.worked, 0)
 }
 
+func KeyFS(dir string, base string) []Key {
+	files, errReadDir := ioutil.ReadDir(dir)
+	if errReadDir != nil {
+		end := strings.LastIndex(dir, "/")
+		if end == -1 {
+			return nil
+		}
+		dir := dir[0:end]
+		if dir == base {
+			return nil
+		}
+		if len(dir) == 0 {
+			return nil
+		}
+		return KeyFS(dir, base)
+	}
+	res := make([]Key, 0)
+	for _, f := range files {
+		if f.IsDir() {
+			array := KeyFS(dir+"/"+f.Name(), base)
+			if array != nil {
+				res = append(res, array...)
+			}
+		} else {
+			path := dir + "/" + f.Name()
+			res = append(res, Key{strings.Replace(path, base, "", 1), f.ModTime()})
+		}
+	}
+	return res
+}
+
 func infoFS(dir string, base string) []string {
 	files, errReadDir := ioutil.ReadDir(dir)
 	if errReadDir != nil {
@@ -91,8 +122,7 @@ func infoFS(dir string, base string) []string {
 			}
 		} else {
 			path := dir + "/" + f.Name()
-			strings.Replace(path, base, "", 1)
-			res = append(res, path)
+			res = append(res, strings.Replace(path, base, "", 1))
 		}
 	}
 	return res

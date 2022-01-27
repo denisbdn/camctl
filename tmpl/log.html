@@ -20,10 +20,19 @@
     <div>{{$notify.Key}}: {{$notify.Value}} - {{$notify.URL}}</div>
     {{ end }}
 
-    <h1>В кеше</h1>
-    {{ range $cache := .Keys }}
-    <div><a href="/get{{$cache.Key}}">{{$cache.Key}}</a> {{$cache.Created.Format "15:04:05"}}</div>
-    {{ end }}
+		{{ if eq .Stream.Type "storage" }}
+			<h1>На диске</h1>
+			{{ range $cache := .Keys }}
+			<div><a href="/history{{$cache.Key}}">{{$cache.Key}}</a> {{$cache.Created.Format "15:04:05"}}</div>
+			{{ end }}
+		{{ end }}
+
+		{{ if eq .Stream.Type "stream" }}
+			<h1>В кеше</h1>
+			{{ range $cache := .Keys }}
+			<div><a href="/get{{$cache.Key}}">{{$cache.Key}}</a> {{$cache.Created.Format "15:04:05"}}</div>
+			{{ end }}
+		{{ end }}
 
     <script>
         var ws
@@ -43,7 +52,8 @@
             console.log('Connected')
             var initObj = {
                 method: "Init",
-                path: "/{{.Stream.User}}/{{.Stream.Cam}}"
+                path: "/{{.Stream.User}}/{{.Stream.Cam}}",
+                type: "{{.Stream.Type}}"
             }
             sendMessage(initObj);
         };
