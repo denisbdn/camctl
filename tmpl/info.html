@@ -25,7 +25,10 @@
             {{ end }}
             {{ range $key, $value := . }}
             <tr>
-                <td> <a href="/log.html?path={{$key}}">{{$key}}</a>: {{$value}} <a href="/close.html?path={{$key}}">закрыть</a></td>
+                <td>
+                  {{$key}}: {{$value}}<br/>
+                  <a href="/streamlog.html?path={{$key}}">лог потока</a> <a href="/storagelog.html?path={{$key}}">лог истории</a> <a href="/close.html?path={{$key}}">закрыть</a>
+                </td>
             </tr>
             {{ end }}
         </table>

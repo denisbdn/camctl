@@ -26,7 +26,8 @@ type TmplHandlers struct {
 	log     *zap.Logger
 	conf    *localconf.Config
 	items   *localproxy.Items
-	ffmpegs *localffmpeg.FfmpegHandler
+	stream  *localffmpeg.StreamHandler
+	storage *localffmpeg.StorageHandler
 }
 
 func (h *TmplHandlers) loadFiles() error {
@@ -63,8 +64,10 @@ func (h *TmplHandlers) loadFiles() error {
 				h.engine.GET("/info.html", h.InfoHandler)
 				h.engine.POST("/info.html", h.InfoHandler)
 			case "log.html":
-				h.engine.GET("/log.html", h.LogHandler)
-				h.engine.POST("/log.html", h.LogHandler)
+				h.engine.GET("/streamlog.html", h.LogHandler)
+				h.engine.POST("/streamlog.html", h.LogHandler)
+				h.engine.GET("/storagelog.html", h.LogHandler)
+				h.engine.POST("/storagelog.html", h.LogHandler)
 			}
 		}
 	}
@@ -85,12 +88,11 @@ func (h *TmplHandlers) RawHandler(c *gin.Context) {
 	c.HTML(http.StatusOK, "raw.html", map[string]interface{}{
 		"now": time.Date(2017, 07, 01, 0, 0, 0, 0, time.UTC),
 	})
-	return
 }
 
 // NewTmplHandlers парсит шаблоны привязывыет урлы и строит объект TmplHandlers
-func NewTmplHandlers(engine *gin.Engine, logger *zap.Logger, config *localconf.Config, items *localproxy.Items, ffmpeg *localffmpeg.FfmpegHandler) *TmplHandlers {
-	res := TmplHandlers{engine: engine, log: logger, conf: config, items: items, ffmpegs: ffmpeg}
+func NewTmplHandlers(engine *gin.Engine, logger *zap.Logger, config *localconf.Config, items *localproxy.Items, stream *localffmpeg.StreamHandler, storage *localffmpeg.StorageHandler) *TmplHandlers {
+	res := TmplHandlers{engine: engine, log: logger, conf: config, items: items, stream: stream, storage: storage}
 	res.engine.Delims("{{", "}}")
 	res.engine.SetFuncMap(template.FuncMap{
 		"formatAsDate": formatAsDate,
@@ -149,9 +151,9 @@ func (s *streamDesc) buildFFMPEGStartURL(host string) (string, error) {
 	}
 	sb.WriteString(host)
 	if strings.HasSuffix(host, "/") {
-		sb.WriteString("ffmpeg/start/")
+		sb.WriteString("stream/start/")
 	} else {
-		sb.WriteString("/ffmpeg/start/")
+		sb.WriteString("/stream/start/")
 	}
 	if len(s.User) == 0 {
 		return sb.String(), fmt.Errorf("'User' is empty")
@@ -209,9 +211,9 @@ func (s *streamDesc) buildFFMPEGStopURL(host string) (string, error) {
 	}
 	sb.WriteString(host)
 	if strings.HasSuffix(host, "/") {
-		sb.WriteString("ffmpeg/start/")
+		sb.WriteString("stream/start/")
 	} else {
-		sb.WriteString("/ffmpeg/start/")
+		sb.WriteString("/stream/start/")
 	}
 	if len(s.User) == 0 {
 		return sb.String(), fmt.Errorf("'User' is empty")
@@ -257,7 +259,6 @@ func (h *TmplHandlers) CreateHandler(c *gin.Context) {
 	} else {
 		c.HTML(http.StatusOK, "create.html", nil)
 	}
-	return
 }
 
 // CloseHandler закрывает поток
@@ -269,7 +270,7 @@ func (h *TmplHandlers) CloseHandler(c *gin.Context) {
 		if !strings.HasPrefix(path, "/") {
 			path = "/" + path
 		}
-		resp, errGet := http.Get(fmt.Sprintf("http://127.0.0.1:%d/ffmpeg/stop%s", *h.conf.Port, path))
+		resp, errGet := http.Get(fmt.Sprintf("http://127.0.0.1:%d/stream/stop%s", *h.conf.Port, path))
 		if errGet != nil {
 			c.HTML(http.StatusOK, "mess.html", Mess{Mess: errGet.Error()})
 			return
@@ -282,18 +283,16 @@ func (h *TmplHandlers) CloseHandler(c *gin.Context) {
 			c.HTML(http.StatusOK, "mess.html", Mess{Mess: errRead.Error()})
 		}
 	}
-	return
 }
 
 // InfoHandler выводит текущие потоки либо проигрывает указанный
 func (h *TmplHandlers) InfoHandler(c *gin.Context) {
 	curr := h.items.GetTranslations()
 	c.HTML(http.StatusOK, "info.html", curr)
-	return
 }
 
 // desk структура описатель для рендеринга
-type desk struct {
+type desc struct {
 	Keys    []localproxy.Key
 	Stream  streamDesc
 	Entries []zapcore.Entry
@@ -305,30 +304,57 @@ func (h *TmplHandlers) LogHandler(c *gin.Context) {
 	if len(path) == 0 {
 		c.HTML(http.StatusOK, "mess.html", Mess{Mess: "'path' is empty"})
 	} else {
-		desc := desk{Keys: h.items.GetFiles(path)}
-		ffmpeg := h.ffmpegs.GetProcArgs(path)
-		if ffmpeg != nil {
-			desc.Entries = ffmpeg.Log.Buffer(200)
-			desc.Stream.URL = ffmpeg.URLIn
-			arr := strings.Split(ffmpeg.Name, "/")
-			if len(arr) > 0 {
-				desc.Stream.User = arr[0]
+		res := desc{Keys: make([]localproxy.Key, 0)}
+		if strings.HasSuffix(c.Request.URL.Path, "streamlog.html") {
+			res.Keys = h.items.GetFiles(path)
+			stream := h.stream.GetProcArgs(path)
+			if stream != nil {
+				res.Entries = stream.Log.Buffer(200)
+				res.Stream.URL = stream.URLIn
+				arr := strings.Split(stream.Name, "/")
+				if len(arr) > 0 {
+					res.Stream.User = arr[0]
+				}
+				if len(arr) > 1 {
+					res.Stream.Cam = arr[1]
+				}
+				res.Stream.WorkDir = filepath.Join(stream.Dir, stream.Name)
+				res.Stream.Notify = make([]notifyDesc, 0)
+				for _, n := range stream.Notifications {
+					res.Stream.Notify = append(res.Stream.Notify, notifyDesc{URL: n.URL, Key: n.Key, Value: n.Value})
+				}
+			} else {
+				res.Entries = make([]zapcore.Entry, 0)
+				res.Stream.Notify = make([]notifyDesc, 0)
 			}
-			if len(arr) > 1 {
-				desc.Stream.Cam = arr[1]
-			}
-			desc.Stream.WorkDir = filepath.Join(ffmpeg.Dir, ffmpeg.Name)
-			desc.Stream.Notify = make([]notifyDesc, 0)
-			for _, n := range ffmpeg.Notifications {
-				desc.Stream.Notify = append(desc.Stream.Notify, notifyDesc{URL: n.URL, Key: n.Key, Value: n.Value})
+		} else if strings.HasSuffix(c.Request.URL.Path, "storagelog.html") {
+			stream := h.storage.GetProcArgs(path)
+			if stream != nil {
+				res.Entries = stream.Log.Buffer(200)
+				res.Stream.URL = stream.URLIn
+				arr := strings.Split(stream.Name, "/")
+				if len(arr) > 0 {
+					res.Stream.User = arr[0]
+				}
+				if len(arr) > 1 {
+					res.Stream.Cam = arr[1]
+				}
+				res.Stream.WorkDir = filepath.Join(stream.Dir, stream.Name)
+				res.Stream.Notify = make([]notifyDesc, 0)
+				for _, n := range stream.Notifications {
+					res.Stream.Notify = append(res.Stream.Notify, notifyDesc{URL: n.URL, Key: n.Key, Value: n.Value})
+				}
+			} else {
+				res.Entries = make([]zapcore.Entry, 0)
+				res.Stream.Notify = make([]notifyDesc, 0)
 			}
 		} else {
-			desc.Entries = make([]zapcore.Entry, 0)
-			desc.Stream.Notify = make([]notifyDesc, 0)
+			res.Entries = make([]zapcore.Entry, 0)
+			res.Stream.Notify = make([]notifyDesc, 0)
 		}
-		c.HTML(http.StatusOK, "log.html", desc)
+
+		c.HTML(http.StatusOK, "log.html", res)
 	}
-	return
 }
 
 // HlsHandler выводит текущие потоки либо проигрывает указанный
@@ -340,7 +366,6 @@ func (h *TmplHandlers) HlsHandler(c *gin.Context) {
 		return
 	}
 	c.HTML(http.StatusOK, "hlsvideo.html", url)
-	return
 }
 
 // ShakaHandler выводит текущие потоки либо проигрывает указанный
@@ -352,7 +377,6 @@ func (h *TmplHandlers) ShakaHandler(c *gin.Context) {
 		return
 	}
 	c.HTML(http.StatusOK, "shakavideo.html", url)
-	return
 }
 
 // DashHandler выводит текущие потоки либо проигрывает указанный
@@ -364,5 +388,4 @@ func (h *TmplHandlers) DashHandler(c *gin.Context) {
 		return
 	}
 	c.HTML(http.StatusOK, "dashvideo.html", url)
-	return
 }

@@ -26,8 +26,11 @@ type Config struct {
 	Cmd       *string
 	Static    *string
 	WorkDir   *string
+	StoreDir  *string
 	TrustedIP *string
 	Port      *uint
+	ChankDur  *uint
+	Chanks    *uint
 
 	regexpIP []*regexp.Regexp
 	cmd      map[string]*template.Template
@@ -109,6 +112,9 @@ func NewConfig(log *zap.Logger) *Config {
 	c.Static = flag.String("static", "static", "static directory path")
 	c.TrustedIP = flag.String("trustedIP", "127.0.0.1;", "tusted host - regexp: list of IP with any delimeter")
 	c.WorkDir = flag.String("workDir", "ffmpeg", "work directory")
+	c.StoreDir = flag.String("storeDir", "store", "store directory")
+	c.ChankDur = flag.Uint("chankDur", 60, "store chank duration")
+	c.Chanks = flag.Uint("chanks", 60, "store chank number")
 	flag.Parse()
 
 	if err := c.parsePort(); err != nil {

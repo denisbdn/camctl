@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -26,6 +27,9 @@ const (
 
 	// WaitDataInCache max time wait from cache in get
 	WaitDataInCache time.Duration = 3 * time.Second
+
+	// WaitDataInCache max time wait from cache in get
+	StorageTimeout time.Duration = 24 * time.Hour
 )
 
 func main() {
@@ -78,7 +82,9 @@ func main() {
 	server.Engine.StaticFile("/", filepath.Join(staticDir, "index.html"))
 	server.Engine.StaticFile("/menu.html", filepath.Join(staticDir, "menu.html"))
 
-	proxy := localproxy.NewItems(bl.Log, conf, CacheTimeout, MaxCacheTimeout, WaitDataInCache)
+	var wg sync.WaitGroup
+
+	proxy := localproxy.NewItems(&wg, bl.Log, conf, CacheTimeout, MaxCacheTimeout, WaitDataInCache)
 	server.Engine.GET("/info/:user/:cam", proxy.ServeHTTP)
 	server.Engine.POST("/info/:user/:cam", proxy.ServeHTTP)
 	server.Engine.GET("/info/:user", proxy.ServeHTTP)
@@ -93,15 +99,25 @@ func main() {
 	server.Engine.DELETE("/put/:user/:cam", proxy.ServeHTTP)
 	server.Engine.DELETE("/put/:user", proxy.ServeHTTP)
 
-	ffmpeg := localffmpeg.NewFfmpegHandler(bl.Log, conf, proxy)
-	server.Engine.GET("/ffmpeg/start/:user/:cam", ffmpeg.ServeHTTP)
-	server.Engine.POST("/ffmpeg/start/:user/:cam", proxy.ServeHTTP)
-	server.Engine.GET("/ffmpeg/stop/:user/:cam", ffmpeg.ServeHTTP)
-	server.Engine.POST("/ffmpeg/stop/:user/:cam", proxy.ServeHTTP)
+	stream := localffmpeg.NewStreamHandler(bl.Log, conf, proxy)
+	server.Engine.GET("/stream/start/:user/:cam", stream.ServeHTTP)
+	server.Engine.POST("/stream/start/:user/:cam", proxy.ServeHTTP)
+	server.Engine.GET("/stream/stop/:user/:cam", stream.ServeHTTP)
+	server.Engine.POST("/stream/stop/:user/:cam", proxy.ServeHTTP)
 
-	tmplHandler := localtmpl.NewTmplHandlers(server.Engine, bl.Log, conf, proxy, ffmpeg)
+	server.Engine.StaticFS("/history", http.Dir(*conf.StoreDir))
 
-	wsHandler := localws.NewWebsocketLog(ffmpeg, bl.Log)
+	storage := localffmpeg.NewStorageHandler(bl.Log, conf)
+	server.Engine.GET("/storage/start/:user/:cam", storage.ServeHTTP)
+	server.Engine.GET("/storage/stop/:user/:cam", storage.ServeHTTP)
+
+	file := localproxy.NewFiles(&wg, bl.Log, conf, StorageTimeout)
+	server.Engine.GET("/allhistory", file.ServeHTTP)
+	server.Engine.POST("/allhistory", file.ServeHTTP)
+
+	tmplHandler := localtmpl.NewTmplHandlers(server.Engine, bl.Log, conf, proxy, stream, storage)
+
+	wsHandler := localws.NewWebsocketLog(stream, bl.Log)
 	server.Engine.GET("/ws", wsHandler.ServeHTTP)
 
 	// время
@@ -109,5 +125,14 @@ func main() {
 	server.Engine.HEAD("/time", tmplHandler.TimeHandler)
 	server.Engine.OPTIONS("/time", tmplHandler.TimeHandler)
 
+	bl.Log.Sugar().Info("Start server")
+
 	server.Engine.Run(*conf.Addr)
+
+	proxy.Close()
+	file.Close()
+
+	wg.Wait()
+
+	bl.Log.Sugar().Info("Stop server")
 }

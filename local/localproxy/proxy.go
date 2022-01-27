@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/antchfx/xmlquery"
@@ -43,6 +44,7 @@ type delItem struct {
 
 // Items file storage
 type Items struct {
+	wg            *sync.WaitGroup
 	log           *zap.Logger
 	conf          *localconf.Config
 	items         map[string]*itemCond                  // тут хранятся данные: чанки и мета описатели - ключ / файл
@@ -52,7 +54,7 @@ type Items struct {
 	timeout       time.Duration // общий
 	maxTimeout    time.Duration // для init сегментов, *.m3u8, *.mpd - они обязательны для mpeg-dash
 	waitData      time.Duration // ожидание из кеша
-	worked        bool
+	worked        *int32
 }
 
 // AddNotifications store notification servers into storage and bind it with name
@@ -81,8 +83,10 @@ func (f *Items) DelNotifications(name string) (localnotif.Notifications, bool) {
 	return res, isFind
 }
 
-func clean(f *Items) {
-	for f.worked {
+func (f *Items) clean() {
+	f.wg.Add(1)
+	defer f.wg.Done()
+	for atomic.LoadInt32(f.worked) != 0 {
 		count := f.Clean()
 		f.log.Sugar().Warnf("Items.Clean %d", count)
 		time.Sleep(f.timeout / 10)
@@ -90,10 +94,15 @@ func clean(f *Items) {
 }
 
 // NewItems create Items
-func NewItems(logger *zap.Logger, config *localconf.Config, timeout time.Duration, maxtimeout time.Duration, waitdata time.Duration) *Items {
-	res := &Items{logger, config, make(map[string]*itemCond), make(map[string][]*localnotif.Notification), make([]delItem, 0, 1), new(sync.RWMutex), timeout, maxtimeout, waitdata, true}
-	go clean(res) // тут удаляются в том числе init-stream0.m4s и init-stream1.m4s без них js плеер падает. Ffmpeg сам удаляет старое вызывает DELETE
+func NewItems(wg *sync.WaitGroup, logger *zap.Logger, config *localconf.Config, timeout time.Duration, maxtimeout time.Duration, waitdata time.Duration) *Items {
+	res := &Items{wg, logger, config, make(map[string]*itemCond), make(map[string][]*localnotif.Notification), make([]delItem, 0, 1), new(sync.RWMutex), timeout, maxtimeout, waitdata, new(int32)}
+	atomic.StoreInt32(res.worked, 1)
+	go res.clean() // тут удаляются в том числе init-stream0.m4s и init-stream1.m4s без них js плеер падает. Ffmpeg сам удаляет старое вызывает DELETE
 	return res
+}
+
+func (f *Items) Close() {
+	atomic.StoreInt32(f.worked, 0)
 }
 
 func copyXML(source *xmlquery.Node, dest *xmlquery.Node) {
@@ -438,8 +447,8 @@ func (f *Items) Get(key string) *Item {
 			// сначала себя обезопасим если совсем никто писать в мапу не будет
 			go func() {
 				time.Sleep(f.waitData)
-				// wg.Add(1)
-				// defer wg.Done()
+				f.wg.Add(1)
+				defer f.wg.Done()
 				find.cond.L.Lock()
 				find.cond.Broadcast()
 				find.cond.L.Unlock()
@@ -462,8 +471,8 @@ func (f *Items) Get(key string) *Item {
 		// сначала себя обезопасим если совсем никто писать в мапу не будет
 		go func() {
 			time.Sleep(f.waitData)
-			// wg.Add(1)
-			// defer wg.Done()
+			f.wg.Add(1)
+			defer f.wg.Done()
 			item.cond.L.Lock()
 			item.cond.Broadcast()
 			item.cond.L.Unlock()
@@ -624,13 +633,6 @@ func Error(c *gin.Context, mess string, code int) {
 	c.Data(code, "text/plain; charset=utf-8", []byte(mess))
 }
 
-// Response is describe out json
-type Response struct {
-	Errno int         `json:"errno,omitempty"`
-	Error string      `json:"error,omitempty"`
-	Data  interface{} `json:"data,omitempty"`
-}
-
 // func (f *Items) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (f *Items) ServeHTTP(c *gin.Context) {
 	now := time.Now()
@@ -701,10 +703,10 @@ func (f *Items) ServeHTTP(c *gin.Context) {
 		key := c.Request.URL.Path[5:]
 		if len(key) == 0 {
 			res := f.GetTranslations()
-			c.JSON(http.StatusOK, Response{Errno: 0, Error: "ok", Data: res})
+			c.JSON(http.StatusOK, Response{Errno: OK, Error: "ok", Data: res})
 		} else {
 			res := f.GetFiles(key)
-			c.JSON(http.StatusOK, Response{Errno: 0, Error: "ok", Data: res})
+			c.JSON(http.StatusOK, Response{Errno: OK, Error: "ok", Data: res})
 		}
 	}
 }

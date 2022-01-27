@@ -12,13 +12,13 @@ import (
 
 // WebsocketLog struct describe websocket handler
 type WebsocketLog struct {
-	ffmpegs    *localffmpeg.FfmpegHandler
+	ffmpegs    *localffmpeg.StreamHandler
 	log        *zap.Logger
 	wsUpgrader websocket.Upgrader
 }
 
 // NewWebsocketLog build WebsocketLog object
-func NewWebsocketLog(ffmpegs *localffmpeg.FfmpegHandler, log *zap.Logger) *WebsocketLog {
+func NewWebsocketLog(ffmpegs *localffmpeg.StreamHandler, log *zap.Logger) *WebsocketLog {
 	res := WebsocketLog{ffmpegs, log, websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024}}
 	return &res
 }
