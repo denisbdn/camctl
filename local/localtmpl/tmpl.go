@@ -320,7 +320,7 @@ func (h *TmplHandlers) LogHandler(c *gin.Context) {
 				if len(arr) > 1 {
 					res.Stream.Cam = arr[1]
 				}
-				res.Stream.WorkDir = filepath.Join(stream.Dir, stream.Name)
+				res.Stream.WorkDir = filepath.Join(*h.conf.WorkDir, stream.Name)
 				res.Stream.Notify = make([]notifyDesc, 0)
 				for _, n := range stream.Notifications {
 					res.Stream.Notify = append(res.Stream.Notify, notifyDesc{URL: n.URL, Key: n.Key, Value: n.Value})
@@ -343,7 +343,7 @@ func (h *TmplHandlers) LogHandler(c *gin.Context) {
 				if len(arr) > 1 {
 					res.Stream.Cam = arr[1]
 				}
-				res.Stream.WorkDir = filepath.Join(stream.Dir, stream.Name)
+				res.Stream.WorkDir = filepath.Join(*h.conf.StoreDir, stream.Name)
 				res.Stream.Notify = make([]notifyDesc, 0)
 				for _, n := range stream.Notifications {
 					res.Stream.Notify = append(res.Stream.Notify, notifyDesc{URL: n.URL, Key: n.Key, Value: n.Value})

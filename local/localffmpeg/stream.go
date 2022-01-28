@@ -172,9 +172,13 @@ func (h *StreamHandler) runFFMPEG(sdpPath string, argsStr string, procArgs *Stre
 		if errRun != nil {
 			procArgs.Log.Log.Sugar().Errorf("stop cmd.Run() for %s return error: %s", sdpPath, errRun.Error())
 			time.Sleep(time.Millisecond * 200)
+			// возможно стоит удалить файл sdpPath
+			// TODO проверить это
 			return
 		}
 		procArgs.Log.Log.Sugar().Warnf("stop cmd.Run() for %s", sdpPath)
+		// возможно стоит удалить файл sdpPath
+		// TODO проверить это
 	}()
 
 	{
