@@ -114,7 +114,7 @@ func NewConfig(log *zap.Logger) *Config {
 	c.WorkDir = flag.String("workDir", "ffmpeg", "work directory")
 	c.StoreDir = flag.String("storeDir", "store", "store directory")
 	c.ChankDur = flag.Uint("chankDur", 60, "store chank duration, secons")
-	c.Chanks = flag.Uint("chanks", 5, "store chank number, number of files")
+	c.Chanks = flag.Uint("chanks", 10, "store chank number, number of files")
 	flag.Parse()
 
 	if err := c.parsePort(); err != nil {

@@ -19,17 +19,11 @@ import (
 )
 
 const (
-	// CacheTimeout is chank time live
-	CacheTimeout time.Duration = 5 * time.Minute
-
-	// MaxCacheTimeout is meta time live
+	// MaxCacheTimeout is meta time live - it is for meta files: m3u8, mdp, init chanks
 	MaxCacheTimeout time.Duration = 24 * time.Hour
 
-	// WaitDataInCache max time wait from cache in get
+	// WaitDataInCache max time wait from cache in get > stream chank duration
 	WaitDataInCache time.Duration = 3 * time.Second
-
-	// WaitDataInCache max time wait from cache in get
-	StorageTimeout time.Duration = 24 * time.Hour
 )
 
 func main() {
@@ -84,7 +78,7 @@ func main() {
 
 	var wg sync.WaitGroup
 
-	proxy := localproxy.NewItems(&wg, bl.Log, conf, CacheTimeout, MaxCacheTimeout, WaitDataInCache)
+	proxy := localproxy.NewItems(&wg, bl.Log, conf, time.Duration(*conf.ChankDur)*time.Second*2, MaxCacheTimeout, WaitDataInCache)
 	server.Engine.GET("/info/:user/:cam", proxy.ServeHTTP)
 	server.Engine.POST("/info/:user/:cam", proxy.ServeHTTP)
 	server.Engine.GET("/info/:user", proxy.ServeHTTP)
@@ -111,7 +105,7 @@ func main() {
 	server.Engine.GET("/storage/start/:user/:cam", storage.ServeHTTP)
 	server.Engine.GET("/storage/stop/:user/:cam", storage.ServeHTTP)
 
-	file := localproxy.NewFiles(&wg, bl.Log, conf, StorageTimeout)
+	file := localproxy.NewFiles(&wg, bl.Log, conf, time.Duration(*conf.ChankDur)*time.Duration(*conf.Chanks)*2*time.Second)
 	server.Engine.GET("/allhistory", file.ServeHTTP)
 	server.Engine.POST("/allhistory", file.ServeHTTP)
 	server.Engine.GET("/allhistory/:user", file.ServeHTTP)

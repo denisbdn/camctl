@@ -88,7 +88,7 @@ func (f *Items) clean() {
 	defer f.wg.Done()
 	for atomic.LoadInt32(f.worked) != 0 {
 		count := f.Clean()
-		f.log.Sugar().Warnf("Items.Clean %d", count)
+		f.log.Sugar().Warnf("Items.Clean %d goroutines %d", count, runtime.NumGoroutine())
 		time.Sleep(f.timeout / 10)
 	}
 }
