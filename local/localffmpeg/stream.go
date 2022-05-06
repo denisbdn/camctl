@@ -138,7 +138,7 @@ func (h *StreamHandler) runFFMPEG(sdpPath string, argsStr string, procArgs *Stre
 		procArgs.Log.Log.Sugar().Errorf("os.Create() for %s.log return error: %s", sdpPath, errFile.Error())
 		return
 	}
-	defer os.Remove(sdpPath + ".log")
+	// defer os.Remove(sdpPath + ".log")
 
 	defer h.delEmptyDir(filepath.Dir(sdpPath))
 	stderr, err := cmd.StderrPipe()
