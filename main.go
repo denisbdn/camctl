@@ -100,9 +100,9 @@ func main() {
 
 	stream := localffmpeg.NewStreamHandler(blStream.Log, conf, proxy)
 	server.Engine.GET("/stream/start/:user/:cam", stream.ServeHTTP)
-	server.Engine.POST("/stream/start/:user/:cam", proxy.ServeHTTP)
+	server.Engine.POST("/stream/start/:user/:cam", stream.ServeHTTP)
 	server.Engine.GET("/stream/stop/:user/:cam", stream.ServeHTTP)
-	server.Engine.POST("/stream/stop/:user/:cam", proxy.ServeHTTP)
+	server.Engine.POST("/stream/stop/:user/:cam", stream.ServeHTTP)
 
 	server.Engine.StaticFS("/history", http.Dir(*conf.StoreDir))
 
