@@ -117,7 +117,6 @@ func (nf *Notifications) Close() (closed int) {
 	closed = 0
 	for _, notif := range *nf {
 		close(notif.Channel)
-		notif.Channel = nil
 		closed++
 	}
 	return
@@ -129,8 +128,7 @@ type Webhook struct {
 
 func (w *Webhook) Notify(log *zap.Logger) {
 	log.Sugar().Warnf("start webhook for url %s", w.URL)
-	_, err := http.Get(w.URL)
-	if err != nil {
+	if _, err := http.Get(w.URL); err != nil {
 		log.Sugar().Errorf("error webhook for url %s", err.Error())
 	}
 	log.Sugar().Warnf("stop webhook for url %s", w.URL)

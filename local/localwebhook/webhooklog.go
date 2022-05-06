@@ -6,7 +6,6 @@ import (
 	"camctl/local/localproxy"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -37,7 +36,6 @@ func (h *WebhookLogHandler) ServeHTTP(c *gin.Context) {
 		entries := h.bufferLog.Buffer(200)
 		var sb strings.Builder
 		for _, entry := range entries {
-			time.Now().Format("2006-01-02 15:04:05")
 			sb.WriteString(entry.Time.Format("2006-01-02 15:04:05"))
 			sb.WriteString("  \t")
 			sb.WriteString(entry.Message)

@@ -38,6 +38,15 @@ type StorageFFMPEG struct {
 	StorageChanks uint   `json:"numbers,omitempty"`
 }
 
+func convertToWebhooks(s []string) localnotif.Webhooks {
+	wh := make(localnotif.Webhooks, 0, len(s))
+	for _, str := range s {
+		wh = append(wh, &localnotif.Webhook{URL: str})
+	}
+
+	return wh
+}
+
 func BuildFFMPEG(name string, workDir string, notifications []string, onstart []string, onstop []string, onerror []string) FFMPEG {
 	now := float64(time.Now().UTC().UnixNano()) / 1000000000
 	nowStr := fmt.Sprintf("%.6f", now)
@@ -52,18 +61,9 @@ func BuildFFMPEG(name string, workDir string, notifications []string, onstart []
 			nt = append(nt, &localnotif.Notification{URL: array[0], Channel: make(chan *localnotif.NotificationData, 30)})
 		}
 	}
-	onStart := make([]*localnotif.Webhook, 0)
-	for _, str := range onstart {
-		onStart = append(onStart, &localnotif.Webhook{URL: str})
-	}
-	onStop := make([]*localnotif.Webhook, 0)
-	for _, str := range onstop {
-		onStop = append(onStop, &localnotif.Webhook{URL: str})
-	}
-	onError := make([]*localnotif.Webhook, 0)
-	for _, str := range onerror {
-		onError = append(onError, &localnotif.Webhook{URL: str})
-	}
+	onStart := convertToWebhooks(onstart)
+	onStop := convertToWebhooks(onstop)
+	onError := convertToWebhooks(onstop)
 	return FFMPEG{Name: name, Dir: workDir, TimeStr: nowStr, Notifications: nt, OnStart: onStart, OnStop: onStop, OnError: onError}
 }
 
