@@ -135,14 +135,22 @@ type notifyDesc struct {
 	Value string `json:"value,omitempty"`
 }
 
+// notifyDesc структура для парсинга параметров при создании вещания - локальная
+type webhookDesc struct {
+	URL string `json:"url,omitempty"`
+}
+
 // streamDesc структура для парсинга параметров при создании вещания - локальная
 type streamDesc struct {
-	URL     string       `json:"url,omitempty"`
-	User    string       `json:"user,omitempty"`
-	Cam     string       `json:"cam,omitempty"`
-	Type    string       `json:"type,omitempty"`
-	WorkDir string       `json:"workdir,omitempty"`
-	Notify  []notifyDesc `json:"notify,omitempty"`
+	URL     string        `json:"url,omitempty"`
+	User    string        `json:"user,omitempty"`
+	Cam     string        `json:"cam,omitempty"`
+	Type    string        `json:"type,omitempty"`
+	WorkDir string        `json:"workdir,omitempty"`
+	Notify  []notifyDesc  `json:"notify,omitempty"`
+	OnStart []webhookDesc `json:"onstart,omitempty"`
+	OnStop  []webhookDesc `json:"onstop,omitempty"`
+	OnError []webhookDesc `json:"onerror,omitempty"`
 }
 
 func (s *streamDesc) buildFFMPEGStartURL(host string) (string, error) {
@@ -200,6 +208,42 @@ func (s *streamDesc) buildFFMPEGStartURL(host string) (string, error) {
 		}
 		add.WriteString(notify.URL)
 		sb.WriteString("&notify=")
+		sb.WriteString(url.QueryEscape(add.String()))
+	}
+	for _, onstart := range s.OnStart {
+		var add strings.Builder
+		if len(onstart.URL) == 0 {
+			continue
+		}
+		if _, errParse := url.ParseQuery(onstart.URL); errParse != nil {
+			return sb.String(), fmt.Errorf("'onstart.URL' parse error %s", errParse)
+		}
+		add.WriteString(onstart.URL)
+		sb.WriteString("&onstart=")
+		sb.WriteString(url.QueryEscape(add.String()))
+	}
+	for _, onstop := range s.OnStop {
+		var add strings.Builder
+		if len(onstop.URL) == 0 {
+			continue
+		}
+		if _, errParse := url.ParseQuery(onstop.URL); errParse != nil {
+			return sb.String(), fmt.Errorf("'onstop.URL' parse error %s", errParse)
+		}
+		add.WriteString(onstop.URL)
+		sb.WriteString("&onstop=")
+		sb.WriteString(url.QueryEscape(add.String()))
+	}
+	for _, onerror := range s.OnError {
+		var add strings.Builder
+		if len(onerror.URL) == 0 {
+			continue
+		}
+		if _, errParse := url.ParseQuery(onerror.URL); errParse != nil {
+			return sb.String(), fmt.Errorf("'onerror.URL' parse error %s", errParse)
+		}
+		add.WriteString(onerror.URL)
+		sb.WriteString("&onerror=")
 		sb.WriteString(url.QueryEscape(add.String()))
 	}
 	return sb.String(), nil

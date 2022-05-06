@@ -2,7 +2,10 @@
 all: compile
 
 compile:
-	go build		
+	go build
+
+clean:
+	rm camctl
 
 install:
 	install ./camctl /usr/local/bin/
@@ -13,7 +16,7 @@ install:
 	cp ./tmpl/* /usr/local/etc/camctl/tmpl/
 	cp ./cmd/* /usr/local/etc/camctl/cmd/
 	cp ./static/* /usr/local/etc/camctl/static/
-	
+
 uninstall:
 	rm -rf /tmpl/camctl/ffmpeg/
 	rm -rf /usr/local/etc/camctl/

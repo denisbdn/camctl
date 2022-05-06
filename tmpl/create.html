@@ -42,16 +42,31 @@
             <input class="target" id="value2" type="text" size="64" placeholder="Value symbol '|' forbiden" />
         </div>
         <div class="block">
-            <input class="target" id="url3" type="text" size="200" placeholder="https://camUser:camPassword@host2/path1 symbol '|' forbiden" />
-            <br />
-            <input class="target" id="key3" type="text" size="64" placeholder="Auth symbol '|' forbiden" />
-            <input class="target" id="value3" type="text" size="64" placeholder="Value symbol '|' forbiden" />
+            Необязательные параметры - webhook при успешной генерации первого чанка:
         </div>
         <div class="block">
-            <input class="target" id="url4" type="text" size="200" placeholder="https://camUser:camPassword@host2/path2 symbol '|' forbiden" />
-            <br />
-            <input class="target" id="key4" type="text" size="64" placeholder="Auth symbol '|' forbiden" />
-            <input class="target" id="value4" type="text" size="64" placeholder="Value symbol '|' forbiden" />
+            <input class="target" id="onstart1" type="text" size="200" placeholder="URL - webhook onstart" />
+        </div>
+        <div class="block">
+            <input class="target" id="onstart2" type="text" size="200" placeholder="URL - webhook onstart" />
+        </div>
+        <div class="block">
+            Необязательные параметры - webhook при штатном закрытии:
+        </div>
+        <div class="block">
+            <input class="target" id="onstop1" type="text" size="200" placeholder="URL - webhook onstop" />
+        </div>
+        <div class="block">
+            <input class="target" id="onstop2" type="text" size="200" placeholder="URL - webhook onstop" />
+        </div>
+        <div class="block">
+            Необязательные параметры - webhook при вне штатном закрытии:
+        </div>
+        <div class="block">
+            <input class="target" id="onerror1" type="text" size="200" placeholder="URL - webhook onerror" />
+        </div>
+        <div class="block">
+            <input class="target" id="onerror2" type="text" size="200" placeholder="URL - webhook onerror" />
         </div>
         <div class="block">
             <label>Сгенерированная data:</label>
@@ -81,17 +96,38 @@
                 add2.value = $("#value2").val();
                 arr.push(add2)
 
-                var add3 = {};
-                add3.url = $("#url3").val();
-                add3.key = $("#key3").val();
-                add3.value = $("#value3").val();
-                arr.push(add3)
+								var onstart = [];
+								o.onstart = onstart;
 
-                var add4 = {};
-                add4.url = $("#url4").val();
-                add4.key = $("#key4").val();
-                add4.value = $("#value4").val();
-                arr.push(add4)
+                var onstart1 = {};
+                onstart1.url = $("#onstart1").val();
+                onstart.push(onstart1)
+
+								var onstart2 = {};
+								onstart2.url = $("#onstart2").val();
+								onstart.push(onstart2)
+
+								var onstop= [];
+								o.onstop = onstop;
+
+								var onstop1 = {};
+								onstop1.url = $("#onstop1").val();
+								onstop.push(onstop1)
+
+								var onstart2 = {};
+								onstop2.url = $("#onstop2").val();
+								onstop.push(onstop2)
+
+								var onerror= [];
+								o.onerror = onerror;
+
+								var onerror1 = {};
+								onerror1.url = $("#onerror1").val();
+								onerror.push(onerror1)
+
+								var onstart2 = {};
+								onerror2.url = $("#onerror2").val();
+								onerror.push(onerror2)
 
                 //console.log(JSON.stringify(o));
                 $("#data").val(JSON.stringify(o));

@@ -15,6 +15,7 @@ import (
 	"camctl/local/localproxy"
 	"camctl/local/localserv"
 	"camctl/local/localtmpl"
+	"camctl/local/localwebhook"
 	"camctl/local/localws"
 )
 
@@ -31,12 +32,16 @@ func main() {
 	cfg := zap.NewProductionConfig()
 	cfg.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.StampNano)
 	cfg.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
-	logger, _ := cfg.Build()
 
-	bl := locallog.NewBuffLog(logger, 2000)
-	defer bl.Close()
+	loggerStream, _ := cfg.Build()
+	blStream := locallog.NewBuffLog(loggerStream, 2000)
+	defer blStream.Close()
 
-	conf := localconf.NewConfig(bl.Log)
+	loggerWebhook, _ := cfg.Build()
+	blWebhook := locallog.NewBuffLog(loggerWebhook, 200)
+	defer blWebhook.Close()
+
+	conf := localconf.NewConfig(blStream.Log)
 
 	// go func() {
 	// 	cn := make(chan zapcore.Entry, 0)
@@ -65,11 +70,11 @@ func main() {
 	// arr := bl.Buffer(5)
 	// fmt.Print(arr)
 
-	server := localserv.NewServer(bl.Log)
+	server := localserv.NewServer(blStream.Log)
 
 	staticDir, err := filepath.Abs(*conf.Static)
 	if err != nil {
-		bl.Log.Error("dir with static files", zap.Error(err))
+		blStream.Log.Error("dir with static files", zap.Error(err))
 		return
 	}
 	server.Engine.StaticFS("/static", http.Dir(staticDir))
@@ -78,7 +83,7 @@ func main() {
 
 	var wg sync.WaitGroup
 
-	proxy := localproxy.NewItems(&wg, bl.Log, conf, time.Duration(*conf.ChankDur)*time.Second*2, MaxCacheTimeout, WaitDataInCache)
+	proxy := localproxy.NewItems(&wg, blStream.Log, conf, time.Duration(*conf.ChankDur)*time.Second*2, MaxCacheTimeout, WaitDataInCache)
 	server.Engine.GET("/info/:user/:cam", proxy.ServeHTTP)
 	server.Engine.POST("/info/:user/:cam", proxy.ServeHTTP)
 	server.Engine.GET("/info/:user", proxy.ServeHTTP)
@@ -93,7 +98,7 @@ func main() {
 	server.Engine.DELETE("/put/:user/:cam", proxy.ServeHTTP)
 	server.Engine.DELETE("/put/:user", proxy.ServeHTTP)
 
-	stream := localffmpeg.NewStreamHandler(bl.Log, conf, proxy)
+	stream := localffmpeg.NewStreamHandler(blStream.Log, conf, proxy)
 	server.Engine.GET("/stream/start/:user/:cam", stream.ServeHTTP)
 	server.Engine.POST("/stream/start/:user/:cam", proxy.ServeHTTP)
 	server.Engine.GET("/stream/stop/:user/:cam", stream.ServeHTTP)
@@ -101,19 +106,19 @@ func main() {
 
 	server.Engine.StaticFS("/history", http.Dir(*conf.StoreDir))
 
-	storage := localffmpeg.NewStorageHandler(bl.Log, conf)
+	storage := localffmpeg.NewStorageHandler(blStream.Log, conf)
 	server.Engine.GET("/storage/start/:user/:cam", storage.ServeHTTP)
 	server.Engine.GET("/storage/stop/:user/:cam", storage.ServeHTTP)
 
-	file := localproxy.NewFiles(&wg, bl.Log, conf, time.Duration(*conf.ChankDur)*time.Duration(*conf.Chanks)*2*time.Second)
+	file := localproxy.NewFiles(&wg, blStream.Log, conf, time.Duration(*conf.ChankDur)*time.Duration(*conf.Chanks)*2*time.Second)
 	server.Engine.GET("/allhistory", file.ServeHTTP)
 	server.Engine.POST("/allhistory", file.ServeHTTP)
 	server.Engine.GET("/allhistory/:user", file.ServeHTTP)
 	server.Engine.POST("/allhistory/:user", file.ServeHTTP)
 
-	tmplHandler := localtmpl.NewTmplHandlers(server.Engine, bl.Log, conf, proxy, stream, storage)
+	tmplHandler := localtmpl.NewTmplHandlers(server.Engine, blStream.Log, conf, proxy, stream, storage)
 
-	wsHandler := localws.NewWebsocketLog(stream, storage, bl.Log)
+	wsHandler := localws.NewWebsocketLog(stream, storage, blStream.Log)
 	server.Engine.GET("/ws", wsHandler.ServeHTTP)
 
 	// время
@@ -121,7 +126,12 @@ func main() {
 	server.Engine.HEAD("/time", tmplHandler.TimeHandler)
 	server.Engine.OPTIONS("/time", tmplHandler.TimeHandler)
 
-	bl.Log.Sugar().Info("Start server")
+	// webhook log
+	webhookLogHandler := localwebhook.NewWebhookLogHandler(blStream.Log, conf, blWebhook)
+	server.Engine.GET("/webhooklog", webhookLogHandler.ServeHTTP)
+	server.Engine.POST("/webhooklog", webhookLogHandler.ServeHTTP)
+
+	blStream.Log.Sugar().Info("Start server")
 
 	server.Engine.Run(*conf.Addr)
 
@@ -130,5 +140,5 @@ func main() {
 
 	wg.Wait()
 
-	bl.Log.Sugar().Info("Stop server")
+	blStream.Log.Sugar().Info("Stop server")
 }

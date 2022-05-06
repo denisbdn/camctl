@@ -126,17 +126,6 @@ func (h *StreamHandler) runFFMPEG(sdpPath string, argsStr string, procArgs *Stre
 		go n.Notify(procArgs.Log.Log)
 	}
 
-	var key string
-	wd, errAbs := filepath.Abs(*h.conf.WorkDir)
-	if errAbs == nil {
-		key = strings.Replace(sdpPath, wd, "", 1)
-		ext := filepath.Ext(key)
-		if len(ext) > 0 {
-			key = strings.Replace(key, ext, "", 1)
-		}
-		h.items.AddNotifications(key, procArgs.Notifications)
-	}
-
 	h.setProcArgs("/"+procArgs.Name, procArgs)
 
 	args := SplitArgs(argsStr)
@@ -167,6 +156,17 @@ func (h *StreamHandler) runFFMPEG(sdpPath string, argsStr string, procArgs *Stre
 	}
 	defer stdout.Close()
 
+	var key string
+	wd, errAbs := filepath.Abs(*h.conf.WorkDir)
+	if errAbs == nil {
+		key = strings.Replace(sdpPath, wd, "", 1)
+		ext := filepath.Ext(key)
+		if len(ext) > 0 {
+			key = strings.Replace(key, ext, "", 1)
+		}
+		h.items.AddNotifications(key, procArgs.Notifications, procArgs.OnStart, procArgs.OnStop, procArgs.OnError)
+	}
+
 	go func() {
 		procArgs.Log.Log.Sugar().Warnf("start cmd.Run() for %s", sdpPath)
 		errRun := cmd.Run()
@@ -174,10 +174,24 @@ func (h *StreamHandler) runFFMPEG(sdpPath string, argsStr string, procArgs *Stre
 			procArgs.Log.Log.Sugar().Errorf("stop cmd.Run() for %s return error: %s", sdpPath, errRun.Error())
 			time.Sleep(time.Millisecond * 200)
 			os.Remove(sdpPath)
+			h.items.DelOnStopWebhooks(key)
+			delOnErrorWebhooks, isFind := h.items.DelOnErrorWebhooks(key)
+			if isFind && delOnErrorWebhooks != nil {
+				for _, webhook := range delOnErrorWebhooks {
+					go webhook.Notify(h.log)
+				}
+			}
 			return
 		}
 		procArgs.Log.Log.Sugar().Warnf("stop cmd.Run() for %s", sdpPath)
 		os.Remove(sdpPath)
+		h.items.DelOnErrorWebhooks(key)
+		delOnStopWebhooks, isFind := h.items.DelOnStopWebhooks(key)
+		if isFind && delOnStopWebhooks != nil {
+			for _, webhook := range delOnStopWebhooks {
+				go webhook.Notify(h.log)
+			}
+		}
 	}()
 
 	{
@@ -228,7 +242,7 @@ func (h *StreamHandler) runFFMPEG(sdpPath string, argsStr string, procArgs *Stre
 		}()
 	}
 
-	for true {
+	for {
 		time.Sleep(time.Millisecond * 200)
 		check, errOpen := os.Open(sdpPath)
 		check.Close()
@@ -237,9 +251,23 @@ func (h *StreamHandler) runFFMPEG(sdpPath string, argsStr string, procArgs *Stre
 		}
 	}
 
+	delOnErrorWebhooks, isFindErr := h.items.DelOnErrorWebhooks(key)
+	delOnStopWebhooks, isFindStop := h.items.DelOnStopWebhooks(key)
+
 	errSig := cmd.Process.Signal(syscall.SIGQUIT)
 	if errSig != nil {
 		h.log.Sugar().Warnf("Process.Signal %s", errSig.Error())
+		if isFindErr && delOnErrorWebhooks != nil {
+			for _, webhook := range delOnErrorWebhooks {
+				go webhook.Notify(h.log)
+			}
+		}
+	} else {
+		if isFindStop && delOnStopWebhooks != nil {
+			for _, webhook := range delOnStopWebhooks {
+				go webhook.Notify(h.log)
+			}
+		}
 	}
 
 	if errAbs == nil {
@@ -248,6 +276,7 @@ func (h *StreamHandler) runFFMPEG(sdpPath string, argsStr string, procArgs *Stre
 			delNotifications.Send(procArgs.Log.Log, &localnotif.NotificationData{Method: "DELETE", Name: "", Header: make(http.Header), Data: nil})
 			delNotifications.Close()
 		}
+		h.items.DelOnStartWebhooks(key)
 	}
 
 	h.delProcArgs("/" + procArgs.Name)
@@ -306,7 +335,7 @@ func (h *StreamHandler) start(c *gin.Context) {
 
 	// ищем шаблон для команды и аргументы
 	tmplName := StreamFfmpegCmd
-	procArgs := BuildStreamFFMPEG(name, workDir, url, *h.conf.Port, localconf.InitSegmentName, *h.conf.ChankDur*2, c.Request.URL.Query()["notify"])
+	procArgs := BuildStreamFFMPEG(name, workDir, url, *h.conf.Port, localconf.InitSegmentName, *h.conf.ChankDur*2, c.Request.URL.Query()["notify"], c.Request.URL.Query()["onstart"], c.Request.URL.Query()["onstop"], c.Request.URL.Query()["onerror"])
 	tmpl, ok := h.conf.GetTmpl(tmplName)
 	if !ok {
 		localproxy.Error(c, "streamffmpeg.cmd not found", http.StatusInternalServerError)

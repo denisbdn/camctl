@@ -44,24 +44,30 @@ type delItem struct {
 
 // Items file storage
 type Items struct {
-	wg            *sync.WaitGroup
-	log           *zap.Logger
-	conf          *localconf.Config
-	items         map[string]*itemCond                  // тут хранятся данные: чанки и мета описатели - ключ / файл
-	notifications map[string][]*localnotif.Notification // тут хранятся нотификации
-	delPrefix     []delItem
-	fileMut       *sync.RWMutex
-	timeout       time.Duration // общий
-	maxTimeout    time.Duration // для init сегментов, *.m3u8, *.mpd - они обязательны для mpeg-dash
-	waitData      time.Duration // ожидание из кеша
-	worked        *int32
+	wg              *sync.WaitGroup
+	log             *zap.Logger
+	conf            *localconf.Config
+	items           map[string]*itemCond                  // тут хранятся данные: чанки и мета описатели - ключ / файл
+	notifications   map[string][]*localnotif.Notification // тут хранятся нотификации
+	onStartWebhooks map[string][]*localnotif.Webhook      // тут хранятся webhooks
+	onStopWebhooks  map[string][]*localnotif.Webhook      // тут хранятся webhooks
+	onErrorWebhooks map[string][]*localnotif.Webhook      // тут хранятся webhooks
+	delPrefix       []delItem
+	fileMut         *sync.RWMutex
+	timeout         time.Duration // общий
+	maxTimeout      time.Duration // для init сегментов, *.m3u8, *.mpd - они обязательны для mpeg-dash
+	waitData        time.Duration // ожидание из кеша
+	worked          *int32
 }
 
 // AddNotifications store notification servers into storage and bind it with name
-func (f *Items) AddNotifications(name string, array localnotif.Notifications) {
+func (f *Items) AddNotifications(name string, notifAarray localnotif.Notifications, onStartWebhooks localnotif.Webhooks, onStopWebhooks localnotif.Webhooks, onErrorWebhooks localnotif.Webhooks) {
 	f.fileMut.Lock()
 	defer f.fileMut.Unlock()
-	f.notifications[name] = array
+	f.notifications[name] = notifAarray
+	f.onStartWebhooks[name] = onStartWebhooks
+	f.onStopWebhooks[name] = onStopWebhooks
+	f.onErrorWebhooks[name] = onErrorWebhooks
 }
 
 // GetNotifications return notification servers by bind name
@@ -72,6 +78,14 @@ func (f *Items) GetNotifications(name string) (localnotif.Notifications, bool) {
 	return res, isFind
 }
 
+// GetNotifications return notification servers by bind name
+func (f *Items) GetOnStartWebhooks(name string) (localnotif.Webhooks, bool) {
+	f.fileMut.Lock()
+	defer f.fileMut.Unlock()
+	res, isFind := f.onStartWebhooks[name]
+	return res, isFind
+}
+
 // DelNotifications remove notification servers by bind name, return it if it finded
 func (f *Items) DelNotifications(name string) (localnotif.Notifications, bool) {
 	f.fileMut.Lock()
@@ -79,6 +93,39 @@ func (f *Items) DelNotifications(name string) (localnotif.Notifications, bool) {
 	res, isFind := f.notifications[name]
 	if isFind {
 		delete(f.notifications, name)
+	}
+	return res, isFind
+}
+
+// DelNotifications remove notification servers by bind name, return it if it finded
+func (f *Items) DelOnStartWebhooks(name string) (localnotif.Webhooks, bool) {
+	f.fileMut.Lock()
+	defer f.fileMut.Unlock()
+	res, isFind := f.onStartWebhooks[name]
+	if isFind {
+		delete(f.onStartWebhooks, name)
+	}
+	return res, isFind
+}
+
+// DelNotifications remove notification servers by bind name, return it if it finded
+func (f *Items) DelOnStopWebhooks(name string) (localnotif.Webhooks, bool) {
+	f.fileMut.Lock()
+	defer f.fileMut.Unlock()
+	res, isFind := f.onStopWebhooks[name]
+	if isFind {
+		delete(f.onStopWebhooks, name)
+	}
+	return res, isFind
+}
+
+// DelNotifications remove notification servers by bind name, return it if it finded
+func (f *Items) DelOnErrorWebhooks(name string) (localnotif.Webhooks, bool) {
+	f.fileMut.Lock()
+	defer f.fileMut.Unlock()
+	res, isFind := f.onErrorWebhooks[name]
+	if isFind {
+		delete(f.onErrorWebhooks, name)
 	}
 	return res, isFind
 }
@@ -95,7 +142,7 @@ func (f *Items) clean() {
 
 // NewItems create Items
 func NewItems(wg *sync.WaitGroup, logger *zap.Logger, config *localconf.Config, timeout time.Duration, maxtimeout time.Duration, waitdata time.Duration) *Items {
-	res := &Items{wg, logger, config, make(map[string]*itemCond), make(map[string][]*localnotif.Notification), make([]delItem, 0, 1), new(sync.RWMutex), timeout, maxtimeout, waitdata, new(int32)}
+	res := &Items{wg, logger, config, make(map[string]*itemCond), make(map[string][]*localnotif.Notification), make(map[string][]*localnotif.Webhook), make(map[string][]*localnotif.Webhook), make(map[string][]*localnotif.Webhook), make([]delItem, 0, 1), new(sync.RWMutex), timeout, maxtimeout, waitdata, new(int32)}
 	atomic.StoreInt32(res.worked, 1)
 	go res.clean() // тут удаляются в том числе init-stream0.m4s и init-stream1.m4s без них js плеер падает. Ffmpeg сам удаляет старое вызывает DELETE
 	return res
@@ -401,8 +448,15 @@ func (f *Items) Add(key string, data []byte, contentType string) *Item {
 	}
 
 	if channel != -1 {
+		// такое бывает 2-ды для видtо initFile и для аудио initFile
 		// TODO - исправить
 		// go f.notify(*config.notifyURL, url.Values{"path": {key}, "channel": {channelName(channel)}})
+		webhooks, isFound := f.DelOnStartWebhooks(filepath.Dir(key)) // удаляем OnStartWebhooks и нотифицируем 1 раз
+		if isFound {
+			for _, webhook := range webhooks {
+				go webhook.Notify(f.log)
+			}
+		}
 	}
 
 	return res

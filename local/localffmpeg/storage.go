@@ -214,7 +214,7 @@ func (h *StorageHandler) runFFMPEG(txtPath string, argsStr string, procArgs *Sto
 		}()
 	}
 
-	for true {
+	for {
 		time.Sleep(time.Millisecond * 200)
 		check, errOpen := os.Open(txtPath)
 		check.Close()
@@ -284,7 +284,7 @@ func (h *StorageHandler) start(c *gin.Context) {
 
 	// ищем шаблон для команды и аргументы
 	tmplName := StorageFfmpegCmd
-	procArgs := BuildStorageFFMPEG(name, storeDir, url, storeDir+name[dirEnd:], *h.conf.ChankDur, *h.conf.Chanks, c.Request.URL.Query()["notify"])
+	procArgs := BuildStorageFFMPEG(name, storeDir, url, storeDir+name[dirEnd:], *h.conf.ChankDur, *h.conf.Chanks, c.Request.URL.Query()["notify"], c.Request.URL.Query()["onstart"], c.Request.URL.Query()["onstop"], c.Request.URL.Query()["onerror"])
 	tmpl, ok := h.conf.GetTmpl(tmplName)
 	if !ok {
 		localproxy.Error(c, tmplName+" not found", http.StatusInternalServerError)

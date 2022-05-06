@@ -122,3 +122,18 @@ func (nf *Notifications) Close() (closed int) {
 	}
 	return
 }
+
+type Webhook struct {
+	URL string `json:"url,omitempty"`
+}
+
+func (w *Webhook) Notify(log *zap.Logger) {
+	log.Sugar().Warnf("start webhook for url %s", w.URL)
+	_, err := http.Get(w.URL)
+	if err != nil {
+		log.Sugar().Errorf("error webhook for url %s", err.Error())
+	}
+	log.Sugar().Warnf("stop webhook for url %s", w.URL)
+}
+
+type Webhooks []*Webhook
